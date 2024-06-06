@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: my_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: mypassword
+      MYSQL_DATABASE: mydatabase
+      MYSQL_USER: myuser
+      MYSQL_PASSWORD: mypassword
+    ports:
+      - "20000:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:6
+    container_name: my_redis
+    ports:
+      - "6379:6379"
+
+  flask_app:
+    build: .
+    container_name: flask_app
+    environment:
+      - SQLALCHEMY_DATABASE_URI=mysql://myuser:mypassword@mysql:3306/mydatabase
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mysql
+      - redis
+
+  celery_worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A app.celery worker --loglevel=info
+    environment:
+      - SQLALCHEMY_DATABASE_URI=mysql://myuser:mypassword@mysql:3306/mydatabase
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - flask_app
+      - redis
+
+volumes:
+  mysql_data:
